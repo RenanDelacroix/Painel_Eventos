@@ -1,0 +1,217 @@
+<?
+  ob_start();
+?>
+<HTML>
+	<HEAD>
+		<TITLE>Painel do Cliente</TITLE>
+		<p align="center"><font size='8' color='#7093DB'><b>Painel de Eventos</b></font></p>
+	</HEAD>
+	<BODY bgcolor='215E21'>
+	<?php
+	
+    session_start();//Garante acesso Restrito
+	    
+    if(!isset($_SESSION["usuario"])) {
+      echo "Acesso Restrito. Necessário login.";
+      exit(1);
+    }
+		 
+    
+    echo "<font color='#7093DB'>Olá ".$_SESSION["usuario"]. ", seu último acesso foi em ".$_COOKIE["ultimoacesso"]."</font><BR><BR>";
+		
+  ?>
+	<FORM method=POST name='logout' action='?deslogar=true'>		<//Ação de Logout>
+	<div align='right'>
+	<INPUT type=SUBMIT value="Efetuar logout">
+	<?if (isset($_REQUEST["deslogar"]) && $_REQUEST == true){
+	  session_destroy(); header("location: index.php");}?>
+	</div>
+	
+	</FORM>
+	<FORM method=POST name='cadastra' action='?cadastrar=true'> 	<//Cadastro de novo evento>
+	<INPUT type=SUBMIT value="Inserir Novo Evento">
+	<?if (isset($_REQUEST["cadastrar"]) && $_REQUEST == true){header("location: cadastra_evento.php");}?>
+	</FORM>
+	
+	<p align='center'><font color='#7093DB' size='4' face='arial'>Todos os eventos cadastrados:</font></p>
+	
+	<TABLE align="center" border='3' bgcolor='#9F9F5F'>
+	<TR>
+		
+		<TD><b>Título do Evento</b></TD>
+		<TD><b>Descrição</b></TD>
+		<TD><b>Data e Hora</b></TD>
+		<TD><b>Status</b></TD>
+		<TD><b>Imagem</b></TD>
+		<TD><b>Editar</b></TD>
+		<TD><b>Excluir</b></TD>
+	</TR>
+		
+	<?
+	
+	
+		try
+		{
+			$connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar host, user e senha
+		}
+		catch(PDOException $e)
+		{
+			echo "Falha: " . $e->getMessage();
+			exit();
+		}
+		
+				
+		if(isset($_REQUEST["excluir"]) && $_REQUEST["excluir"] == true)  //Exclusão de evento 
+		{
+		
+		$rs = $connection->prepare("SELECT id_usuario FROM eventos WHERE id = ?");
+        $rs->bindParam(1, $_REQUEST["id"]);
+		
+		if($rs->execute())
+		{
+		  $check = $rs->fetch(PDO::FETCH_OBJ);
+		  if($check->id_usuario != $_SESSION["id_usuario"] && $_SESSION["master"] != 1)  //O criador do evento e, o adm terão permissão de deletar os eventos
+		  {
+		    echo "Permissão negada para excluir! <BR>Evento criado por outro usuário.<BR>";
+		  }
+		  
+		}
+		
+		
+		  $stmt = $connection->prepare("DELETE FROM eventos WHERE id = ? AND id_usuario = ?");
+          $stmt->bindParam(1, $_REQUEST["id"]);
+		  $stmt->bindParam(2, $_SESSION["id_usuario"]);
+          $stmt->execute();
+		
+		
+		if($check->id_usuario != $_SESSION["id_usuario"] && $_SESSION["master"] == 1){
+		  $stmt = $connection->prepare("DELETE FROM eventos WHERE id = ?");
+          $stmt->bindParam(1, $_REQUEST["id"]);
+		  $stmt->execute();
+		}
+        
+          if($stmt->errorCode() != "00000")
+          {
+            echo "Erro na exclusão de eventos<BR>";
+            echo "Código do erro: " . $stmt->errorCode() . "<BR>";
+            echo implode(" ", $stmt->errorInfo());
+          }
+		  
+		  
+		  
+		}
+		
+		if(isset($_REQUEST["editar"]) && $_REQUEST["editar"] == true) // Prepara edição de evento
+		
+		{
+		
+		$rs = $connection->prepare("SELECT id_usuario FROM eventos WHERE id = ?");
+        $rs->bindParam(1, $_REQUEST["id"]);
+		$rs->execute();
+		$check = $rs->fetch(PDO::FETCH_OBJ);
+		 
+	    if($check->id_usuario == $_SESSION["id_usuario"]) // Somente o criador do evento poderá editar o evento dele
+		{
+		    
+		$_SESSION["id"] = $_REQUEST["id"];
+		$stmt = $connection->prepare("SELECT * FROM eventos WHERE id = ?");
+        $stmt->bindParam(1, $_REQUEST["id"]);
+		
+		
+		  if($stmt->execute())
+		  {
+			while($registro = $stmt->fetch(PDO::FETCH_OBJ)) //Pega Informações já digitadas
+			{
+				$_SESSION["titulo"] = $registro->titulo;
+				$_SESSION["descricao"] = $registro->descricao;
+				$_SESSION["flag"] = $registro->flag;
+				$_SESSION["data"] = $registro->dia;
+				
+			}
+		  }
+		  else
+		  {
+		  echo "Erro na edição de eventos<BR>";
+          echo "Código do erro: " . $stmt->errorCode() . "<BR>";
+          echo implode(" ", $stmt->errorInfo());
+		  }
+		  if(isset($_SESSION["titulo"]) && isset($_SESSION["descricao"]) && isset($_SESSION["flag"]))
+		{
+			header("location: editar_evento.php");
+		}
+		}
+		else
+		{
+		echo "Permissão negada para editar!<BR>Evento criado por outro usuário.";
+		}
+	   	}	
+		
+		$rs = $connection->prepare("SELECT * FROM eventos ORDER BY dia");    //Painel do CLiente
+      
+		if($rs->execute())
+		{
+		
+        while($registro = $rs->fetch(PDO::FETCH_OBJ))
+        {
+		$checkFlag=$registro->flag;
+		$checkData=$registro->dia;
+		$convertData=$registro->dia; 				//Bloco de conversão de Data para BR
+		$arrayData = explode(" ", $convertData);
+		$convertData2 = $arrayData["0"];
+		$convertHora = $arrayData["1"];
+		$arrayData = explode("-", $convertData2);
+		
+		for($cont=2;$cont>=0;$cont--)
+		{
+			$data.=$arrayData[$cont];
+			if($cont>0)
+			{
+			$data.="/";
+			}
+		}
+		$data2=$data;
+		$data=NULL;
+		$arrayHora = explode(":", $convertHora);
+		
+		for($cont=0;$cont<2;$cont++)
+		{
+		$hora.=$arrayHora[$cont];
+		if($cont<1)
+		{
+			$hora.=":";
+		}
+		}											
+		$hora2=$hora;
+		$hora=NULL;									//Fim do bloco de conversão de data para BR
+		
+          echo "<TR>";
+          echo "<TD>".$registro->titulo."</TD>";
+          echo "<TD>".$registro->descricao."</TD>";
+          echo "<TD>".$data2." às ".$hora2."</TD>";
+          echo "<TD>".($registro->flag=="R"?"Rascunho":"Publicado")."</TD>";
+          echo "<TD> <img src='upload/".$registro->id_usuario."-".$registro->id.".jpeg ' width='80' height='80'></TD>"; 
+          
+		  echo "<TD><A href='painel_cliente.php?editar=true&id=".$registro->id."'>
+				<p align='center'><font color=blue>E</font></p></A></TD>";//Botão de edição
+				
+		  echo "<TD><A href='painel_cliente.php?excluir=true&id=".$registro->id."'>
+				<p align='center'><font color=red>X</font></p></A></TD>"; //Cria botão de exclusão
+		  echo "</TR>";
+		}
+		}
+		else
+		{
+		  echo "Falha na seleção de usuários. Verificar conexão com o Banco de Dados";
+		}
+		
+	?>
+	
+	</TABLE>
+		
+	</BODY>
+	
+		
+</HTML>
+<?
+  ob_flush();
+?>
