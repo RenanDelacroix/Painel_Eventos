@@ -1,0 +1,260 @@
+<?
+	ob_start();
+?>
+<?php
+$valido=false;
+$erro=NULL;
+
+session_start();
+
+if(isset($_REQUEST["inserir"]) && $_REQUEST["inserir"] == "true") {  // Upload de Imagem
+				if(isset($_FILES["imagem"])) {
+					$arquivoNome = $_FILES["imagem"]["name"];
+					$arquivoTipo = $_FILES["imagem"]["type"];
+					$nomeTemporario = $_FILES["imagem"]["tmp_name"];
+					$erroImg = $_FILES["imagem"]["error"];
+					
+					
+					  if($erroImg == 0) {
+					    if($arquivoTipo == "image/jpeg"){
+					       mkdir('upload', 0777, true);
+						 if(is_uploaded_file($nomeTemporario)) 
+						 {
+							if(move_uploaded_file($nomeTemporario, "upload/".$arquivoNome)) {
+								
+								echo "Imagem do Evento:<BR>";
+								echo $arquivoNome."<BR>";
+								session_start();
+								$_SESSION["img"] = $arquivoNome;
+								
+								echo "<img src='upload/".$arquivoNome."' width='80' height='80'>";
+
+							}
+						 }
+						}
+						else{
+						echo "Tipo de arquivo inválido. Selecione uma imagem em formato Jpeg."."<BR>";
+						
+						}
+						
+					}
+				}
+			}
+
+if(isset($_REQUEST["salvar"]) && $_REQUEST["salvar"] == true) //Trata a entrada dos dados na atualização
+	{
+			
+		if(strlen($_POST["titulo"]) == 0)
+		{
+			$erro="Preencha o Título do Evento.";
+		}
+		else if(strlen($_POST["descricao"]) < 10)
+		{
+			$erro="Escreva uma descrição com no mínimo 10 caracteres.";
+		}
+		else if(strlen($_POST["data"]) != 10)
+		{
+			$erro="Preencha a data corretamente.";
+		}
+		else if(strlen($_POST["hora"]) < 5)
+		{
+			$erro="Preencha a hora corretamente.";
+		}
+		else if($_POST["flag"] != "P" && $_POST["flag"] != "R")
+		{
+			$erro="Marque a opção para Publicar ou Rascunho.";
+		}
+		else
+		{
+			$valido = true;
+			$data = str_replace("-", "/", $_POST["data"]);  
+			$hora = $_POST["hora"].":00";
+			$dia = $data." ".$hora;
+		
+		
+			try
+			{
+				$connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar: host, user e senha
+			}
+			catch(PDOException $e)
+			{
+				echo "Falha: " . $e->getMessage();
+				exit();
+			}
+			$stmt = $connection->prepare("UPDATE eventos SET titulo = ?, descricao = ?, dia = ?, flag = ? WHERE id = ?"); 
+							
+			$stmt->bindParam(1, $_POST["titulo"]);
+			$stmt->bindParam(2, $_POST["descricao"]);
+			$stmt->bindParam(3, $dia);
+			$stmt->bindParam(4, $_POST["flag"]);
+			$stmt->bindParam(5, $_SESSION["id"]);
+			$stmt->execute();
+			
+			$oldName="upload/".$_SESSION["img"];
+			$newName="upload/".$_SESSION["id_usuario"]."-".$_SESSION["id"].".jpeg";
+			rename($oldName, $newName);
+			
+			
+			
+			if($stmt->errorCode() != "00000")
+			{
+			  $valido = false;
+			  $erro = "Erro código " . $stmt->errorCode() . ": ";
+			  $erro .= implode(" ", $stmt->errorInfo());
+			}
+			 
+			
+			
+			
+		}
+	}
+?>
+
+	<? //Inicia verificando a imagem atual e mostrando em tela
+		session_start();
+        $dir = opendir("C:/wamp/www/PainelDeEventos/upload"); //necessário alterar para a pasta correta na troca de servidor
+        
+		
+		try
+			{
+				$connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar: host, user e senha
+			}
+			catch(PDOException $e)
+			{
+				echo "Falha: " . $e->getMessage();
+				exit();
+			}
+			$stmt = $connection->prepare("SELECT id_usuario FROM eventos WHERE id = ?"); 
+			
+			$stmt->bindParam(1, $_SESSION["id"]);
+			$stmt->execute();
+			$registro=$stmt->fetch(PDO::FETCH_OBJ);
+			$idUsuario=$registro->id_usuario;
+			$nomeArquivo = $idUsuario."-".$_SESSION["id"].".jpeg";
+			
+			if($stmt->errorCode() != "00000")
+			{
+			  $valido = false;
+			  $erro = "Erro código " . $stmt->errorCode() . ": ";
+			  $erro .= implode(" ", $stmt->errorInfo());
+			}
+
+		
+		do
+        {
+        $leitura=readdir($dir);
+        		
+		if($leitura == $nomeArquivo){
+		 if(!isset($_REQUEST["inserir"])){
+			echo "<p>Sua imagem atual para este evento:</p>";
+			echo "<img src='upload/".$nomeArquivo."' width='80' height='80'>"."<BR><BR>";
+		 }
+		} 
+		    
+        } while($leitura != NULL );
+             
+        closedir($dir);
+		//Conversão de data para BR
+		$arrayData = explode(" ", $_SESSION["data"]);
+		$data = $arrayData["0"];
+		$convertHora = $arrayData["1"];
+				
+		$arrayHora = explode(":", $convertHora);
+		
+		for($cont=0;$cont<2;$cont++) //horas
+		{
+		$hora.=$arrayHora[$cont];
+		if($cont<1)
+		{
+			$hora.=":";
+		}
+		}											
+		$hora2=$hora;
+		$hora=NULL;
+		
+					  
+	?>
+<HTML>
+	<HEAD>
+		<TITLE>Editar Evento</TITLE>
+	</HEAD>
+	<BODY bgcolor='#93DB70'>
+	
+	<?
+	session_start();//Garante acesso Restrito
+	 
+    if(!isset($_SESSION["usuario"])) {
+      echo "Acesso Restrito. Necessário login.";
+      exit(1);
+    }
+	
+		
+	?>
+	
+	<? 
+	if(!$valido)
+	{
+		if(isset($erro))
+		{
+			echo $erro."<BR><BR>";
+		}
+	
+	?>
+		<FORM enctype="multipart/form-data" method=POST action='editar_evento.php?inserir=true'>
+		<INPUT name='imagem' type=FILE>
+		<BR><INPUT type=SUBMIT value='Salvar Imagem'>
+		</FORM>
+
+		<FORM method=POST name='validar' action='?salvar=true'>
+		<b>Atualize as informações do Evento:</b>
+		<BR><BR>
+		
+		Titulo: 	
+		<INPUT type=TEXT name='titulo'<?if(!isset($_REQUEST["salvar"])){echo"value='".$_SESSION["titulo"]."'";}
+		if(isset($_POST["titulo"])){echo"value='".$_POST["titulo"]."'";}?>><BR>
+		Descrição:
+		<BR>
+		<TEXTAREA name='descricao' rows="10" cols="30"><?if(!isset($_REQUEST["salvar"])){echo $_SESSION["descricao"];}
+		if(isset($_POST["descricao"])){echo $_POST["descricao"];}?></TEXTAREA><BR>
+		
+		Data:	
+		<INPUT type=DATE name='data'<? if(!isset($_REQUEST["salvar"])){ echo "value='" . $data."'";} 
+		if(isset($_POST["data"])){echo " value='" . $_POST["data"]."'";}?>><BR> 
+		
+		Hora:	
+		<INPUT type=TIME name='hora'<?if(!isset($_REQUEST["salvar"])){ echo "value='" . $hora2 . "'";}
+		if(isset($_POST["hora"])){echo " Data digitada: " . $_POST["hora"];}?>><BR>
+				
+		Status:	
+		<INPUT type=RADIO name=flag value='P'<?if(!isset($_REQUEST["salvar"]) && $_SESSION["flag"]=="P"){echo"checked";}
+		if(isset($_POST["flag"]) && $_POST["flag"]=="P"){echo"checked";}?>>Publicar
+
+		<INPUT type=RADIO name=flag value='R'<?if(!isset($_REQUEST["salvar"]) && $_SESSION["flag"]=="R"){echo"checked";}
+		if(isset($_POST["flag"]) && $_POST["flag"]=="R"){echo"checked";}?>>Rascunho<BR>
+		
+		
+				
+		<INPUT type=SUBMIT value='Salvar'>
+		</FORM>
+
+<?
+	}
+		else{
+		
+		unset($_SESSION["id"]);
+		unset($_SESSION["titulo"]);
+		unset($_SESSION["flag"]);
+		unset($_SESSION["img"]);
+		unset($_REQUEST["data"]);
+		
+		header("location: painel_cliente.php");
+		
+		
+		}
+	?>
+
+ </BODY>
+</HTML>
+<?
+	ob_flush();
+?>
