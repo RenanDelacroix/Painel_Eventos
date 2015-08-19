@@ -1,0 +1,169 @@
+<?
+ob_start();
+?>
+
+<?php  		//Validar Botão de Login/Cadastro
+$login = true;
+if(isset($_REQUEST["cadastrar"]) && $_REQUEST["cadastrar"] == true) 
+{
+header("location: cadastro.php");
+}
+	if(isset($_REQUEST["logar"]) && $_REQUEST["logar"] == true) //Verifica e Efetua o Login
+	{
+
+      $passwordHash = md5($_POST["senha"]);
+      
+      try
+		  {
+		    $connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com o banco verificar host, user, senha
+      }
+      catch(PDOException $e)
+      {
+        echo "Falha: " . $e->getMessage();
+        exit();
+      }
+
+      $rs = $connection->prepare("SELECT nome, id, adm_master FROM USUARIOS WHERE email = ? AND SENHA = ?");                           
+    
+      $rs->bindParam(1, $_POST["email"]);
+      $rs->bindParam(2, $passwordHash);
+
+      if($rs->execute())
+      {
+        if($registro = $rs->fetch(PDO::FETCH_OBJ))
+        {
+        
+          setcookie("ultimoacesso", date("d/m/Y"), time() + 30*24*60*60);
+        
+          session_start();
+          $_SESSION["usuario"] = $registro->nome;
+		  $_SESSION["id_usuario"] = $registro->id;
+		  $_SESSION["master"] = $registro->adm_master;
+        
+          header("location: painel_cliente.php");
+        
+        }      
+        else 
+        {
+          $login = false;
+        }
+      }
+    } //Fim da verificação de Login
+  ?>
+  
+
+
+
+<HTML>
+	<HEAD>
+		<TITLE>Home</TITLE>
+		<p align="center"><font size='9' color='#8FBC8F'>Olá Visitante!</font></p>
+	</HEAD>
+	<BODY bgcolor='215E21'>
+	<p align="center"><font color='C0D9D9' size='4'> <B>Confira os próximos eventos.</B></font></p>
+	<div align="center"><font color='C0D9D9' size='2' face='italic'>Cadastre-se e divulgue o seu evento.</font></div>
+	
+	<FORM method=POST name='cadastro'; action='?cadastrar=true'> <// Botão de Cadastro de Cliente>
+	<INPUT type=SUBMIT value='Clique e Cadastre-se'>
+	<?if(isset($_COOKIE["cadastrado"]))echo "<B><BR>Cadastrado com Sucesso</B><BR><BR>";{}//Mensagem de cadastrado com sucesso temporária?>
+	</FORM>	
+		
+	<TABLE align="center" border='2' bgcolor='#93DB70'>
+	<TR>
+		<TD><b>Título do Evento</b></TD>
+		<TD><b>Descrição</b></TD>
+		<TD><b>Data e Hora</b></TD>
+		<TD><b>Imagem</b></TD>
+	</TR>
+	
+	<?
+		
+		try
+		{
+			$connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar host, user e senha
+		}
+		catch(PDOException $e)
+		{
+			echo "Falha: " . $e->getMessage();
+			exit();
+		}
+				
+		$rs = $connection->prepare("SELECT * FROM eventos ORDER BY dia");
+      
+		$dataValida = date("Y-m-d H:i:s");
+		if($rs->execute())
+		{
+				
+        while($registro = $rs->fetch(PDO::FETCH_OBJ))
+        {
+		$checkFlag=$registro->flag;
+		$checkData=$registro->dia;
+		$convertData=$registro->dia; 				//Bloco de conversão de Data para BR
+		$arrayData = explode(" ", $convertData);
+		$convertData2 = $arrayData["0"];
+		$convertHora = $arrayData["1"];
+		$arrayData = explode("-", $convertData2);
+		
+		for($cont=2;$cont>=0;$cont--)
+		{
+			$data.=$arrayData[$cont];
+			if($cont>0)
+			{
+			$data.="/";
+			}
+		}
+		$data2=$data;
+		$data=NULL;
+		$arrayHora = explode(":", $convertHora);
+		
+		for($cont=0;$cont<2;$cont++)
+		{
+		$hora.=$arrayHora[$cont];
+		if($cont<1)
+		{
+			$hora.=":";
+		}
+		}											
+		$hora2=$hora;
+		$hora=NULL;									//Fim do bloco de conversão de data para BR
+		
+		
+		
+		if($checkFlag != "R" && $checkData >= $dataValida) //Garante listagem dos "não rascunhos" e de eventos não vencidos
+		{
+		
+          echo "<TR>";
+          echo "<TD>".$registro->titulo."</TD>";
+          echo "<TD>".$registro->descricao."</TD>";
+          echo "<TD>".$data2." às ".$hora2."</TD>";
+          echo "<TD> <img src='upload/".$registro->id_usuario."-".$registro->id.".jpeg' width='80' height='80'> </TD>";
+          echo "</TR>";
+		}  
+		}
+		}
+		
+		else
+		{
+		  echo "Falha na seleção de usuários. Verificar conexão com o Banco de Dados";
+		}
+			
+	?>
+		
+	</TABLE>
+	
+	<FORM method=POST name='login'; action='?logar=true'> <// Botão de Login?>
+	<BR><B><I><font color='#FF2400'>Já é cadastrado? Efetue seu Login</font></I></B><BR>
+	<font color='#C0D9D9'>E-MAIL:</font>
+		<INPUT type=TEXT name='email'><BR>
+	<font color='#C0D9D9'>SENHA:</font>
+		<INPUT type=PASSWORD name='senha'><BR>
+		<INPUT type=SUBMIT value='Efetuar Login'>
+		<BR>
+		<?if(!$login){echo "Email ou senha Inválidos.";}?>
+	</FORM>
+		
+	</BODY>
+</HTML>
+<?
+ob_flush();
+?>
