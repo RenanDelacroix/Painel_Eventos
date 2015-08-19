@@ -1,0 +1,25 @@
+CREATE DATABASE painel_de_eventos;
+
+USE painel_de_eventos;
+
+CREATE TABLE usuarios (
+id INT NOT NULL AUTO_INCREMENT,
+nome VARCHAR(64) NOT NULL,
+email VARCHAR(64) NOT NULL,
+senha VARCHAR(32) NULL,
+adm_master TINYINT,
+PRIMARY KEY (id)
+);
+
+CREATE TABLE eventos (
+id INT NOT NULL AUTO_INCREMENT,
+titulo VARCHAR(64) NOT NULL,
+descricao VARCHAR(128),
+dia TIMESTAMP,
+flag VARCHAR(1),
+path_imagem VARCHAR(64),
+id_usuario INT,
+PRIMARY KEY (id) 
+);
+
+ALTER TABLE eventos ADD CONSTRAINT fk_id_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios (id);
