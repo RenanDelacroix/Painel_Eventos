@@ -1,0 +1,208 @@
+<?
+  ob_start();
+?>
+<?php //Tratamento do campo de cadastro de eventos
+$erro=NULL;
+$valido=false;
+
+	if(isset($_REQUEST["inserir"]) && $_REQUEST["inserir"] == "true") { //Upload de Imagem
+				if(isset($_FILES["imagem"])) {
+					$arquivoNome = $_FILES["imagem"]["name"];
+					$arquivoTipo = $_FILES["imagem"]["type"];
+					$nomeTemporario = $_FILES["imagem"]["tmp_name"];
+					$erroImg = $_FILES["imagem"]["error"];
+					
+					
+					  if($erroImg == 0) {
+					    if($arquivoTipo == "image/jpeg"){
+					       mkdir('upload', 0777, true);
+						 if(is_uploaded_file($nomeTemporario)) 
+						 {
+							if(move_uploaded_file($nomeTemporario, "upload/".$arquivoNome)) {
+								
+								echo "Imagem do Evento:<BR>";
+								echo $arquivoNome."<BR>";
+								session_start();
+								$_SESSION["img"] = $arquivoNome;
+								
+								echo "<img src='upload/".$arquivoNome."' width='80' height='80'>";
+
+							}
+						 }
+						}
+						else{
+						echo "Tipo de arquivo inválido. Selecione uma imagem em formato Jpeg."."<BR>";
+						
+						}
+						
+					}
+				}
+			}
+	
+	
+	if(isset($_REQUEST["validar"]) && $_REQUEST["validar"] == true) //Trata a entrada dos dados
+	{
+	
+		
+		
+		if(strlen($_POST["titulo"]) == 0)
+		{
+			$erro="Preencha o Título do Evento.";
+		}
+		else if(strlen($_POST["descricao"]) < 10)
+		{
+			$erro="Escreva uma descrição com no mínimo 10 caracteres.";
+		}
+		else if(strlen($_POST["data"]) != 10)
+		{
+			$erro="Preencha a data corretamente.";
+		}
+		else if(strlen($_POST["hora"]) < 5)
+		{
+			$erro="Preencha a hora corretamente.";
+		}
+		else if($_POST["flag"] != "P" && $_POST["flag"] != "R")
+		{
+			$erro="Marque a opção para Publicar ou Rascunho.";
+		}
+		else
+		{
+		
+						
+			$valido = true;
+			$data = str_replace("-", "/", $_POST["data"]);  
+			$hora = $_POST["hora"].":00";
+			$dia = $data." ".$hora;
+			
+			try
+			{
+				$connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar host, user e senha
+			}
+			catch(PDOException $e)
+			{
+				echo "Falha: " . $e->getMessage();
+				exit();
+			}
+			
+			session_start();
+			
+			
+			
+			$stmt = $connection->prepare("INSERT INTO eventos (titulo, descricao, dia, flag, id_usuario) values (?, ?, ?, ?, ?)");                           
+    
+			$stmt->bindParam(1, $_POST["titulo"]);
+			$stmt->bindParam(2, $_POST["descricao"]);
+			$stmt->bindParam(3, $dia);
+			$stmt->bindParam(4, $_POST["flag"]);
+			$stmt->bindParam(5, $_SESSION["id_usuario"]); //Inserindo idUsuario no campo de eventos, linkando permissões ao usuário que cadastrou.
+			$stmt->execute();
+			
+			$stmt = $connection->prepare("SELECT id FROM eventos WHERE id_usuario=? AND titulo=? AND descricao=?");
+			$stmt->bindParam(1, $_SESSION["id_usuario"]);
+			$stmt->bindParam(2, $_POST["titulo"]);
+			$stmt->bindParam(3, $_POST["descricao"]);
+			$stmt->execute();
+			$registro=$stmt->fetch(PDO::FETCH_OBJ);
+			
+			$oldName="upload/".$_SESSION["img"];
+			$newName="upload/".$_SESSION["id_usuario"]."-".$registro->id.".jpeg";
+			rename($oldName, $newName);
+			
+			if($stmt->errorCode() != "00000")
+			{
+			  $valido = false;
+			  $erro = "Erro código " . $stmt->errorCode() . ": ";
+			  $erro .= implode(" ", $stmt->errorInfo());
+			  
+			}
+			
+			
+			
+			
+			
+		}
+	}
+?>
+<HTML>
+	<HEAD>
+		<TITLE>Cadastro de Evento</TITLE>
+	</HEAD>
+	<BODY bgcolor='#93DB70'>
+	<? //Verifica necessidade de login
+    session_start();
+    
+    if(!isset($_SESSION["usuario"])) {
+      echo "Acesso Restrito. Necessário login.";
+      exit(1);
+    }
+	?>
+	
+	<? 
+	if(!$valido)
+	{
+		if(isset($erro))
+		{
+			echo $erro."<BR><BR>";
+		}
+		
+		
+	
+	?>
+			
+		<p><b>1º Selecione uma imagem para o evento, se desejar.<BR>Então clique em salvar.</b> "Somente formato jpeg".</p>
+		
+		
+		<FORM enctype="multipart/form-data" method=POST action='cadastra_evento.php?inserir=true'>
+			<INPUT name='imagem' type=FILE>
+			<BR><INPUT type=SUBMIT value='Salvar Imagem'>
+		</FORM>
+		
+		<BR><BR>
+		
+		<FORM method=POST name='registro'; action='?validar=true'>  <//Para Cadastro de Eventos com auto preenchimento em caso de erros>
+		
+		<b>2º Preencha os campos abaixo para cadastrar um novo evento:</b>
+		<BR><BR>
+		
+		Titulo: 	
+		<INPUT type=TEXT name='titulo' <? if(isset($_POST["titulo"])) { echo "value='".$_POST["titulo"]."'"; } ?> ><BR>
+		Descrição:
+		<BR>
+		<TEXTAREA name='descricao' rows="10" cols="30"><? if(isset($_POST["descricao"])) { echo $_POST["descricao"]; } ?></TEXTAREA><BR>
+		
+		Data:	
+		<INPUT type=DATE name='data'><BR>
+		
+		Hora:	
+		<INPUT type=TIME name='hora'><BR>
+				
+		Status:	
+		<INPUT type=RADIO name=flag value='P' <? if(isset($_POST["flag"]) && $_POST["flag"] == "P") { echo "checked"; } ?>>Publicar
+
+		<INPUT type=RADIO name=flag value='R' <? if(isset($_POST["flag"]) && $_POST["flag"] == "R") { echo "checked"; } ?>>Rascunho<BR>
+		
+		<BR><INPUT type=SUBMIT value='Cadastrar Evento'>
+		
+		
+		</FORM>
+		
+		
+		
+	<?
+	}
+		else{
+		
+		unset($_SESSION["img"]);
+		
+		header("location: painel_cliente.php");
+		
+			
+		}
+	?>
+	
+
+	</BODY>
+</HTML>
+<?
+  ob_flush();
+?>
