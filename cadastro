@@ -1,0 +1,144 @@
+<?
+ob_start();
+?>
+
+<?php  //Bloco de Verificação de Dados
+
+$erro = null;
+$valido = false;
+define ("emailModelo1", ".com.br");
+define ("emailModelo2", ".com");
+define ("emailModelo3", ".org.br");
+
+
+if(isset($_REQUEST["validar"]) && $_REQUEST["validar"] == true) //Valida o cadastro
+{
+
+    if(strlen($_POST["nome"]) < 3) 
+	{
+		$erro = "Preencha o campo nome corretamente";
+	}
+	else if(strlen($_POST["email"]) < 5) //Tratar melhor futuramente
+	{
+		$erro = "Preencha o campo email corretamente";
+	}
+	else if(strlen($_POST["senha"]) < 6) 
+	{
+		$erro = "Preencha o campo senha com 6 ou mais caracteres";
+	}
+	else 
+	{
+		$valido = true;
+		
+		$passwordHash = md5($_POST["senha"]);
+	try
+		{
+		  $connection = new PDO("mysql:host=localhost;dbname=painel_de_eventos", "root", ""); //Conexão com banco verificar host, user e senha
+    }
+    catch(PDOException $e)
+    {
+      echo "Falha: " . $e->getMessage();
+      exit();
+    }
+	
+	$stmt = $connection -> prepare("SELECT id FROM usuarios");
+	$stmt -> execute();
+	$registro = $stmt-> fetch(PDO::FETCH_OBJ);
+	
+	if($registro->id == NULL){
+	$master = 1;
+	}
+	else{
+	$master = 0;
+	}
+	
+	$checkEmail = $_POST["email"];
+	$checagem = false;
+	$fim = strpos($checkEmail, "@");
+	$x=strchr($checkEmail, "@");
+	$y=strchr($x, ".");
+	$z=substr($checkEmail, 0, $fim);
+	 
+	 if($x == NULL || $y == NULL){
+	 $erro = "Formato de email inválido. Ex: exemplo@domínio.com";
+	 $valido = false;
+	 }
+	 else if($y != emailModelo1 && $y != emailModelo2 && $y != emailModelo3){
+	 $erro = "Formato de email inválido. Ex: exemplo@domínio.com.br";
+	 $valido = false;
+	 }
+	 else if($z == NULL){
+	 $erro = "Formato de email inválido, sem ID de usuário. Ex: SEU_ID@domínio.com";
+	 $valido = false;
+	 }
+	 else{
+	 $checagem=true;
+	 }
+		
+	  if($checagem==true)
+	  {
+      $stmt = $connection -> prepare("INSERT INTO usuarios (nome, email, senha, adm_master) values (?, ?, ?, ?)");
+	  $stmt -> bindParam(1, $_POST["nome"]);
+	  $stmt -> bindParam(2, $_POST["email"]);
+	  $stmt -> bindParam(3, $passwordHash);
+	  $stmt -> bindParam(4, $master);
+	  $stmt -> execute();
+	
+		if($stmt->errorCode() != "00000")
+		{
+		$valido = false;
+		$erro = "Erro código " . $stmt->errorCode() . ": ";
+		$erro .= implode(" ", $stmt->errorInfo());
+		}
+	  }
+	}
+}
+//Fim da verificação de dados
+?> 
+
+<HTML>
+	<HEAD>
+		<TITLE>Login/Cadastro</TITLE>
+	</HEAD>
+	<BODY bgcolor='#215E21'>
+	
+	<? //Permite retomar os formulários em caso de falha
+	if(!$valido) {
+	if(isset($erro)) {
+		echo $erro . "<BR><BR>";
+		
+	}
+	?>
+	
+	<FORM method=POST name='registro'; action='?validar=true'>  <//Para Cadastro de Clientes com auto preenchimento em caso de erros>
+		
+		<b><font color='#7093DB'>Não é cadastrado? Preencha os campos abaixo e cadastre-se.</font></b>
+		<BR><BR>
+		
+		<font color='#7093DB'>Nome:</font> 	
+		<INPUT type=TEXT name='nome' <? if(isset($_POST["nome"]) && isset($_REQUEST["validar"]) != true) { echo "value='".$_POST["nome"]."'"; } ?> ><BR>
+
+		<font color='#7093DB'>E-mail:</font>	
+		<INPUT type=TEXT name='email' <? if(isset($_POST["email"])&& isset($_REQUEST["validar"]) != true) { echo "value='".$_POST["email"]."'"; } ?>><BR>
+	
+		<font color='#7093DB'>Senha: </font>	
+		<INPUT type=PASSWORD name=senha><BR>
+		<INPUT type=SUBMIT value='Cadastrar'>
+	
+	</FORM>
+		
+	<?
+	}
+	else //Caso cadastrado com sucesso
+	{
+	setcookie("cadastrado", date("dd/mm/YY"), time() + 5);
+	echo header ("location: index.php");;
+	
+	}
+	?>
+		
+	</BODY>
+</HTML>
+<?
+ob_flush();
+?>
