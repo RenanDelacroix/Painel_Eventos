@@ -17,7 +17,6 @@ titulo VARCHAR(64) NOT NULL,
 descricao VARCHAR(128),
 dia TIMESTAMP,
 flag VARCHAR(1),
-adm_master TINYINT,
 id_usuario INT,
 PRIMARY KEY (id) 
 );
